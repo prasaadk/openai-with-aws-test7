@@ -40,6 +40,22 @@ resource "aws_iam_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_role_policy" "lambda_s3_write" {
+  name = "lambda_s3_write_policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["s3:PutObject"],
+        Resource = "${aws_s3_bucket.bucket.arn}/*"
+      }
+    ]
+  })
+}
+
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = "${path.module}/../lambda"
@@ -47,11 +63,11 @@ data "archive_file" "lambda_zip" {
 }
 
 resource "aws_lambda_function" "example" {
-  function_name = "create-file-lambda"
-  handler       = "lambda_function.lambda_handler"
-  runtime       = "python3.11"
-  role          = aws_iam_role.lambda_role.arn
-  filename      = data.archive_file.lambda_zip.output_path
+  function_name    = "create-file-lambda"
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.11"
+  role             = aws_iam_role.lambda_role.arn
+  filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = filebase64sha256(data.archive_file.lambda_zip.output_path)
   environment {
     variables = {
@@ -66,9 +82,9 @@ resource "aws_apigatewayv2_api" "api" {
 }
 
 resource "aws_apigatewayv2_integration" "lambda_integration" {
-  api_id             = aws_apigatewayv2_api.api.id
-  integration_type   = "AWS_PROXY"
-  integration_uri    = aws_lambda_function.example.invoke_arn
+  api_id                 = aws_apigatewayv2_api.api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.example.invoke_arn
   payload_format_version = "2.0"
 }
 
